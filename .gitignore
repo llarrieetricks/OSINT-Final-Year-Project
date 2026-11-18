@@ -1,33 +1,70 @@
+
+# =========================================
+# PYTHON
+# =========================================
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+osint-service/venv/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# =========================================
+# NODE.JS
+# =========================================
+
 # Dependencies
 node_modules/
 
-# Environment variables
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# =========================================
+# ENVIRONMENT VARIABLES
+# =========================================
+
+# Environment secrets
 .env
 .env.*
 !.env.example
 
-# Build files
+# =========================================
+# BUILD OUTPUT
+# =========================================
+
 dist/
 build/
 coverage/
 
-# Logs
-*.log
-npm-debug.log*
+# =========================================
+# EDITORS AND OPERATING SYSTEM
+# =========================================
 
-# Editor files
+# VS Code
 .vscode/
+
+# IDE files
 .idea/
+*.swp
+*.swo
 
-# OS files
+# Operating system files
 .DS_Store
+Thumbs.db
 
-# Local databases
-*.sqlite
-*.sqlite3
+# =========================================
+# BACKUP AND INSTALLATION FILES
+# =========================================
 
-# Python
-__pycache__/
-*.py[cod]
-*.venv/
-venv/
+*.bak
+*.deb
+*.tmp
