@@ -9,7 +9,7 @@ function App() {
   return (
     <main className={`app-shell ${darkMode ? "theme-dark" : "theme-light"}`}>
       <header className="site-header">
-        <a className="brand" href="#top">SignalWatch</a>
+        <a className="brand" href="#top">PhishCracker</a>
         <div className="header-actions">
           <span className="header-label">OSINT URL assessment</span>
           <button
@@ -24,7 +24,7 @@ function App() {
       </header>
       <div className="page-shell" id="top">
         <section className="intro">
-          <p className="eyebrow">URL intelligence</p>
+          <p className="eyebrow">OSINT nURL intelligence</p>
           <h1>Know the risk before you click.</h1>
           <p>Check suspicious links against transparent URL-risk indicators and get a clear recommendation.</p>
         </section>
