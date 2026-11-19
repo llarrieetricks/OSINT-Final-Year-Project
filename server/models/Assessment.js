@@ -108,11 +108,33 @@ const urlhausSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// OpenPhish threat intelligence schema
+const openphishSchema = new mongoose.Schema(
+  {
+    source: String,
+    available: Boolean,
+    matched: {
+      type: Boolean,
+      default: null,
+    },
+    queryStatus: String,
+    url: String,
+    feedEntries: Number,
+    checkedAt: Date,
+    error: String,
+  },
+  { _id: false }
+);
+
 // Threat intelligence collection schema
 const threatIntelligenceSchema = new mongoose.Schema(
   {
     urlhaus: {
       type: urlhausSchema,
+      default: null,
+    },
+    openphish: {
+      type: openphishSchema,
       default: null,
     },
   },
@@ -140,4 +162,3 @@ const assessmentSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model("Assessment", assessmentSchema);
-

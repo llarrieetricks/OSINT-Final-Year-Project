@@ -9,198 +9,492 @@ function formatDate(value) {
     : date.toLocaleString();
 }
 
-function ThreatFeedCard({ title, data }) {
-  if (!data) {
-    return (
-      <article className="threat-feed-card">
-        <h4>{title}</h4>
-        <p>Data unavailable.</p>
-      </article>
-    );
+function getSeverity(severity) {
+  const value = (severity || "info").toLowerCase();
+
+  if (["critical", "high", "medium", "low"].includes(value)) {
+    return value;
   }
 
-  let status = "Unavailable";
-  let statusClass = "unknown";
+  return "info";
+}
 
-  if (data.available === true) {
-    if (data.matched === true) {
-      status = "Match found";
-      statusClass = "matched";
-    } else if (data.matched === false) {
-      status = "No match found";
-      statusClass = "clear";
-    }
-  }
+function ThreatFeedCard({ title, data, description, symbol }) {
+  const available = data?.available === true;
+  const matched = data?.matched === true;
+
+  const status = !available
+    ? "Unavailable"
+    : matched
+      ? "Match detected"
+      : "No match detected";
+
+  const statusClass = !available
+    ? "unknown"
+    : matched
+      ? "matched"
+      : "clear";
 
   return (
-    <article className="threat-feed-card">
-      <div className="feed-heading">
-        <h4>{title}</h4>
+    <article className={`evidence-feed-card ${statusClass}`}>
+      <div className="feed-card-top">
+        <div className="feed-source-icon">{symbol}</div>
         <span className={`feed-status ${statusClass}`}>
           {status}
         </span>
       </div>
 
-      <p>
-        {data.available
-          ? data.matched
-            ? `This URL appears in the ${title} threat intelligence source.`
-            : `No matching URL was found in ${title}.`
-          : "The threat intelligence source could not be checked."}
-      </p>
+      <h4>{title}</h4>
+      <p className="feed-description">{description}</p>
 
-      {data.threat && (
-        <p><strong>Threat category:</strong> {data.threat}</p>
+      <div className="feed-result">
+        <span className="feed-result-indicator">
+          {matched ? "!" : available ? "✓" : "?"}
+        </span>
+
+        <span>
+          {!available
+            ? "Source could not be checked"
+            : matched
+              ? "URL found in this intelligence source"
+              : "No matching URL found"}
+        </span>
+      </div>
+
+      {data?.threat && (
+        <p className="feed-meta">
+          <strong>Threat category:</strong> {data.threat}
+        </p>
       )}
 
-      {data.urlhausId && (
-        <p><strong>URLhaus ID:</strong> {data.urlhausId}</p>
+      {data?.urlhausId && (
+        <p className="feed-meta">
+          <strong>URLhaus ID:</strong> {data.urlhausId}
+        </p>
       )}
 
-      {data.feedEntries !== undefined && (
-        <p><strong>Feed entries:</strong> {data.feedEntries}</p>
+      {data?.feedEntries !== undefined && (
+        <p className="feed-meta">
+          <strong>Feed entries:</strong> {data.feedEntries}
+        </p>
       )}
 
-      <small>Checked: {formatDate(data.checkedAt)}</small>
+      <div className="feed-footer">
+        <span>Last checked</span>
+        <span>{formatDate(data?.checkedAt)}</span>
+      </div>
     </article>
   );
 }
 
-function DetailCard({ title, children }) {
+function EvidenceCard({ item, index }) {
+  const severity = getSeverity(item.severity);
+
   return (
-    <article className="technical-card">
-      <h4>{title}</h4>
-      {children}
+    <article className={`evidence-card severity-${severity}`}>
+      <div className="evidence-card-top">
+        <div className={`evidence-number ${severity}`}>
+          {String(index + 1).padStart(2, "0")}
+        </div>
+
+        <span className={`severity-label ${severity}`}>
+          {severity}
+        </span>
+      </div>
+
+      <h4>{item.category || "Security indicator"}</h4>
+
+      <p className="evidence-description">
+        {item.details || "No additional explanation is available."}
+      </p>
+
+      <div className="evidence-card-footer">
+        <span>Risk contribution</span>
+        <strong>+{item.weight ?? 0}</strong>
+      </div>
     </article>
+  );
+}
+
+function DetailCard({ title, subtitle, symbol, children }) {
+  return (
+    <details className="technical-card">
+      <summary>
+        <div className="technical-card-icon">{symbol}</div>
+
+        <div className="technical-card-heading">
+          <h4>{title}</h4>
+          <span>{subtitle}</span>
+        </div>
+
+        <span className="technical-toggle">+</span>
+      </summary>
+
+      <div className="technical-card-content">
+        {children}
+      </div>
+    </details>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="technical-row">
+      <span>{label}</span>
+      <strong>{value ?? "Unavailable"}</strong>
+    </div>
   );
 }
 
 export default function AssessmentResult({ assessment }) {
-  const riskClass = (assessment.riskLevel || "unknown")
+  if (!assessment) return null;
+
+  const score = Math.max(
+    0,
+    Math.min(100, Number(assessment.riskScore) || 0)
+  );
+
+  const riskLevel = assessment.riskLevel || "Unknown";
+
+  const riskClass = riskLevel
     .toLowerCase()
     .replaceAll(" ", "-");
+
+  const indicators = Array.isArray(assessment.indicators)
+    ? assessment.indicators
+    : [];
 
   const intelligence = assessment.threatIntelligence || {};
   const dnsRecords = assessment.dns?.records || {};
 
+  const matchedFeeds = [
+    intelligence.openphish,
+    intelligence.urlhaus,
+  ].filter((feed) => feed?.available === true && feed?.matched === true).length;
+
+  const unavailableFeeds = [
+    intelligence.openphish,
+    intelligence.urlhaus,
+  ].filter((feed) => !feed || feed.available !== true).length;
+
+  const highSeverity = indicators.filter((item) =>
+    ["critical", "high"].includes(getSeverity(item.severity))
+  ).length;
+
+  const mediumSeverity = indicators.filter(
+    (item) => getSeverity(item.severity) === "medium"
+  ).length;
+
   return (
     <section className="assessment-result" aria-live="polite">
-      <div className="result-heading">
-        <div>
-          <p className="eyebrow">Assessment complete</p>
-          <h2>Risk assessment</h2>
-        </div>
 
-        <span className={`risk-badge ${riskClass}`}>
-          {assessment.riskLevel}
-        </span>
+      {/* ASSESSMENT HERO */}
+
+      <div className={`evidence-hero ${riskClass}`}>
+        <div className="hero-background-glow" />
+
+        <div className="hero-content">
+          <div className="hero-topline">
+            <span className="hero-live-indicator" />
+            SECURITY ANALYSIS COMPLETE
+          </div>
+
+          <div className="hero-main">
+            <div className="hero-copy">
+              <p className="eyebrow">THREAT INTELLIGENCE REPORT</p>
+              <h2>Assessment overview</h2>
+
+              <p className="hero-description">
+                A detailed analysis of the submitted URL, its security
+                indicators and available threat intelligence evidence.
+              </p>
+
+              <div className={`hero-risk-status ${riskClass}`}>
+                <span className="risk-status-icon">
+                  {score >= 70 ? "!" : score >= 30 ? "◆" : "✓"}
+                </span>
+                <span>{riskLevel}</span>
+              </div>
+            </div>
+
+            <div
+              className="risk-gauge"
+              style={{ "--score": `${score * 3.6}deg` }}
+              role="img"
+              aria-label={`Risk score ${score} out of 100`}
+            >
+              <div className="risk-gauge-inner">
+                <strong>{score}</strong>
+                <span>RISK SCORE</span>
+                <small>OUT OF 100</small>
+              </div>
+            </div>
+          </div>
+
+          <div className="hero-url">
+            <div>
+              <span className="hero-url-label">ANALYSED URL</span>
+              <p>{assessment.url || "URL unavailable"}</p>
+            </div>
+            <span className="hero-url-icon">↗</span>
+          </div>
+
+          <div className="hero-date">
+            <span>◷</span>
+            Assessment date: {formatDate(assessment.createdAt)}
+          </div>
+        </div>
       </div>
 
-      <div className="score-summary">
-        <div
-          className="score-value"
-          aria-label={`Risk score ${assessment.riskScore} out of 100`}
-        >
-          <strong>{assessment.riskScore}</strong>
-          <span>/100</span>
+      {/* EVIDENCE OVERVIEW */}
+
+      <section className="evidence-overview">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">INVESTIGATION SUMMARY</p>
+            <h3>Evidence at a glance</h3>
+            <p>Key findings collected during this assessment.</p>
+          </div>
+          <span className="section-heading-icon">⌘</span>
         </div>
 
+        <div className="evidence-stat-grid">
+          <article className="evidence-stat">
+            <div className="stat-icon purple">◈</div>
+            <span>Total indicators</span>
+            <strong>{indicators.length}</strong>
+            <small>Detected signals</small>
+          </article>
+
+          <article className="evidence-stat">
+            <div className="stat-icon red">!</div>
+            <span>High severity</span>
+            <strong>{highSeverity}</strong>
+            <small>Critical and high findings</small>
+          </article>
+
+          <article className="evidence-stat">
+            <div className="stat-icon amber">◇</div>
+            <span>Medium severity</span>
+            <strong>{mediumSeverity}</strong>
+            <small>Moderate risk findings</small>
+          </article>
+
+          <article className="evidence-stat">
+            <div className="stat-icon green">⌁</div>
+            <span>Feed matches</span>
+            <strong>{matchedFeeds}</strong>
+            <small>
+              {unavailableFeeds} source(s) unavailable
+            </small>
+          </article>
+        </div>
+      </section>
+
+      {/* SECURITY RECOMMENDATION */}
+
+      <section className="recommendation-panel">
+        <div className="recommendation-symbol">✦</div>
+
         <div>
-          <p className="result-url">{assessment.url}</p>
-          <p className="muted">
-            Assessed {formatDate(assessment.createdAt)}
+          <span className="section-kicker">SECURITY GUIDANCE</span>
+          <h3>Recommended action</h3>
+          <p>
+            {assessment.recommendation ||
+              "No recommendation is currently available."}
           </p>
         </div>
-      </div>
+      </section>
 
-      <div className="recommendation">
-        <h3>Security recommendation</h3>
-        <p>{assessment.recommendation || "No recommendation available."}</p>
-      </div>
+      {/* EVIDENCE INDICATORS */}
 
-      <div className="evidence-heading">
-        <h3>Risk indicators</h3>
-        <span>
-          {assessment.indicators?.length || 0} signals
-        </span>
-      </div>
+      <section className="evidence-section">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">DETECTED SECURITY SIGNALS</p>
+            <h3>Risk evidence</h3>
+            <p>
+              Individual findings contributing to the assessment.
+            </p>
+          </div>
 
-      {assessment.indicators?.length > 0 ? (
-        <ul className="indicator-list">
-          {assessment.indicators.map((item, index) => (
-            <li key={`${item.category}-${index}`}>
-              <span
-                className={`severity-dot ${item.severity}`}
-                aria-hidden="true"
+          <span className="evidence-count">
+            {indicators.length} FINDINGS
+          </span>
+        </div>
+
+        {indicators.length > 0 ? (
+          <div className="evidence-grid">
+            {indicators.map((item, index) => (
+              <EvidenceCard
+                key={`${item.category || "indicator"}-${index}`}
+                item={item}
+                index={index}
               />
+            ))}
+          </div>
+        ) : (
+          <div className="evidence-empty">
+            <div className="empty-icon">✓</div>
+            <h4>No warning indicators detected</h4>
+            <p>
+              No risk indicators were returned by the current
+              assessment. This does not guarantee that the URL is safe.
+            </p>
+          </div>
+        )}
+      </section>
 
-              <div>
-                <strong>{item.category}</strong>
-                <p>{item.details}</p>
-              </div>
+      {/* THREAT INTELLIGENCE */}
 
-              <span className="weight">+{item.weight}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="empty-evidence">
-          No high-confidence URL warning signals were found.
-        </p>
-      )}
+      <section className="evidence-section">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">EXTERNAL THREAT SOURCES</p>
+            <h3>Threat intelligence</h3>
+            <p>
+              Results from external URL reputation and threat feeds.
+            </p>
+          </div>
 
-      <section className="threat-intelligence">
-        <div className="evidence-heading">
-          <h3>Threat intelligence</h3>
+          <span className="evidence-count">LIVE SOURCES</span>
         </div>
 
         <div className="threat-feed-grid">
           <ThreatFeedCard
             title="OpenPhish"
+            symbol="◉"
+            description="Phishing-specific URL intelligence."
             data={intelligence.openphish}
           />
 
           <ThreatFeedCard
             title="URLhaus"
+            symbol="⌁"
+            description="Malicious URL intelligence, including malware distribution."
             data={intelligence.urlhaus}
           />
         </div>
       </section>
 
-      <section className="technical-details">
-        <div className="evidence-heading">
-          <h3>Technical intelligence</h3>
+      {/* TECHNICAL INTELLIGENCE */}
+
+      <section className="evidence-section technical-section">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">DEEP TECHNICAL ANALYSIS</p>
+            <h3>Technical intelligence</h3>
+            <p>
+              Expand each category to inspect the collected evidence.
+            </p>
+          </div>
+
+          <span className="section-heading-icon">⌘</span>
         </div>
 
         <div className="technical-grid">
-          <DetailCard title="WHOIS information">
-            <p><strong>Domain:</strong> {assessment.whois?.domain || "Unavailable"}</p>
-            <p><strong>Registrar:</strong> {assessment.whois?.registrar || "Unavailable"}</p>
-            <p><strong>Created:</strong> {formatDate(assessment.whois?.creationDate)}</p>
-            <p><strong>Expires:</strong> {formatDate(assessment.whois?.expirationDate)}</p>
+
+          <DetailCard
+            title="WHOIS information"
+            subtitle="Domain registration"
+            symbol="◎"
+          >
+            <DetailRow
+              label="Domain"
+              value={assessment.whois?.domain}
+            />
+            <DetailRow
+              label="Registrar"
+              value={assessment.whois?.registrar}
+            />
+            <DetailRow
+              label="Creation date"
+              value={formatDate(assessment.whois?.creationDate)}
+            />
+            <DetailRow
+              label="Expiration date"
+              value={formatDate(assessment.whois?.expirationDate)}
+            />
           </DetailCard>
 
-          <DetailCard title="DNS records">
-            {Object.entries(dnsRecords).map(([type, result]) => (
-              <p key={type}>
-                <strong>{type}:</strong>{" "}
-                {result?.records?.length
-                  ? result.records.join(", ")
-                  : result?.error || "No records found"}
+          <DetailCard
+            title="DNS records"
+            subtitle="Domain resolution"
+            symbol="⌘"
+          >
+            {Object.entries(dnsRecords).length > 0 ? (
+              Object.entries(dnsRecords).map(([type, result]) => (
+                <DetailRow
+                  key={type}
+                  label={type}
+                  value={
+                    result?.records?.length
+                      ? result.records.join(", ")
+                      : result?.error || "No records found"
+                  }
+                />
+              ))
+            ) : (
+              <p className="technical-empty">
+                No DNS records available.
               </p>
-            ))}
+            )}
           </DetailCard>
 
-          <DetailCard title="SSL certificate">
-            <p><strong>Hostname:</strong> {assessment.ssl?.hostname || "Unavailable"}</p>
-            <p><strong>Issuer:</strong> {assessment.ssl?.issuer?.organizationName || assessment.ssl?.issuer?.commonName || "Unavailable"}</p>
-            <p><strong>Valid:</strong> {assessment.ssl?.valid === true ? "Yes" : assessment.ssl?.valid === false ? "No" : "Unknown"}</p>
-            <p><strong>Expired:</strong> {assessment.ssl?.expired === true ? "Yes" : assessment.ssl?.expired === false ? "No" : "Unknown"}</p>
-            <p><strong>Days until expiry:</strong> {assessment.ssl?.daysUntilExpiry ?? "Unavailable"}</p>
+          <DetailCard
+            title="SSL certificate"
+            subtitle="Connection security"
+            symbol="▣"
+          >
+            <DetailRow
+              label="Hostname"
+              value={assessment.ssl?.hostname}
+            />
+            <DetailRow
+              label="Issuer"
+              value={
+                assessment.ssl?.issuer?.organizationName ||
+                assessment.ssl?.issuer?.commonName
+              }
+            />
+            <DetailRow
+              label="Certificate valid"
+              value={
+                assessment.ssl?.valid === true
+                  ? "Yes"
+                  : assessment.ssl?.valid === false
+                    ? "No"
+                    : "Unknown"
+              }
+            />
+            <DetailRow
+              label="Expired"
+              value={
+                assessment.ssl?.expired === true
+                  ? "Yes"
+                  : assessment.ssl?.expired === false
+                    ? "No"
+                    : "Unknown"
+              }
+            />
+            <DetailRow
+              label="Days until expiry"
+              value={assessment.ssl?.daysUntilExpiry}
+            />
           </DetailCard>
+
         </div>
       </section>
+
+      <div className="evidence-disclaimer">
+        <span>ⓘ</span>
+        <p>
+          Risk scores and threat intelligence findings are based on
+          available evidence at the time of assessment. A low score
+          does not guarantee that a URL is harmless.
+        </p>
+      </div>
+
     </section>
   );
 }
-
